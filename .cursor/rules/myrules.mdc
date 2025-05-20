@@ -1,0 +1,79 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+1. INTEGRATED SITUATION 
+
+Project description
+
+XWZ LTD is a company responsible formanaging and charging parking in kigali city and some other area in 
+Rwanda in terms of providing security for their automobiles and collecting both street and private parkig fees for local government and private entities reespectivly.
+XWZ LTD  already has a Car parkig management system which was developed in a Monolithic Archtecture where it was 
+facing vqarious problems of scalability becaue the entitre application s runs as single unit , deployng updates which required redeployment
+the entire application and increasing downtime and risks. Duye to the mentioned issues caused by Monolithic Archtecturec, XWZ LTD
+would like to upgrade the care parking management system using microservices archtecutrre to allow independent scallig of individual
+serives, update anbd deploy independently where there users can book parking space, check available space , pay fees, monitor  parking 
+duration , find out the number of cars entered in the parking at different location and have real time reporting.
+
+As a full stack developer, you have been hired to upgrade for them Car parking management system with these minimum features below:
+
+TASKS
+
+Task1: Requirement Analysis and design
+
+you are required to 
+
+    1. Define and design database model (using dbdiagram code for this )
+    2. Design system archtecture (use mermaide code for this)
+    3. Create user registration/ sign up mockup using figma with the fololowing details User(id, firstName, LastName, email and password).
+
+Task2: User management
+
+you are required to :
+
+    1. Identify user roles (e.g admin, parking attendant).
+    2. Implement the User registration designed
+    3. Implement user authenticatoin using either Token-based Authentication (JWT) or Session-Based Authenticaion .
+    4. Allow admin andother user to login into the system after signing up 
+
+Task 3: Manage parking information
+
+you are required to:
+
+    1. Register parkign with the following details(code, parking name, number of available spaces, location , charging fee per hour);
+    2. Allow parking atendant (drivers) to view available parking and avaiable space, charging fees per hour.
+
+Task 4: Record Incoming and /outgoing of cars in the parking
+
+    1. Register car entry with details (id, plate number, parking code, entry date time, exit date time , and charged amount; by default the exit date time shoul dbe NULL and charged Amount is set to zero(o). These two fields charged amount and exit date time should be updated when the care exit (outgoing)the parking.
+    2. Generate ticket on entry care in the parking.
+    3. Generate the bill indicating how long the care is parked and the total amount charge on outgoing.
+    4. Update the number ov vacant spaces in the parking for each incoming and outgoing
+
+Task 5: Generate reports
+
+You are required to 
+
+    1. Display all outgoing of cars in the parkign with total amount charged between two date times
+    2. Displayt all Entered cars in the parking between two date times
+
+Instructions
+
+    1. As the starting point, you shoul dread carefully the problem to be solved adn write down appropriate software requirements such as designs including but not limited to the database design, data flow of your applicaion and name of possible forms that need to be developed.
+    2. Other requiements
+    3. You should desing the mockup of this sytem first using figma, Designb only one page(user registration/signup form)
+    4. You should build frontend using react.js or any other JavaScritp framework from your choice.
+    5. You should backend using either Node.js
+    6. User signup and logic should be performed using the front end form.
+    7. Registering parking details, Car entry and care extit should be added using designed forms
+    8. Other record not mentioned int he requiements maybe registered using forms, or any other ui tools.
+    9. You should either use PostgreSQL as your DBMS.
+    10. You should document your bakcenD APIs using swagger UI.
+    11. You shou7ld use JWT in authenticaion and authorizatioin.
+    12. Ensure all records are displayed in a paginated manner.
+    13. Display logs properly
+    14. Handle exceptions and validations properly where applicable.
+    15. Handle CORS and any other common web security attacks properly.
+    16. Good looking and responsive system wins more points
+    17. Document each and every thing in read me 
