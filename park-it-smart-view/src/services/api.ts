@@ -48,6 +48,11 @@ export interface DashboardSummary {
     activity: string;
     time: string;
   }[];
+  pagination?: {
+    total: number;
+    totalPages: number;
+    currentPage: number;
+  };
 }
 
 // Mock users for testing
@@ -162,9 +167,14 @@ export const authService = {
 // Real API services with fallback to mock data
 // Parking lots service
 export const parkingLotsService = {
-  getAll: async (): Promise<ParkingLot[]> => {
+  getAll: async (params?: { page?: number; limit?: number }): Promise<{ data: ParkingLot[]; pagination?: { total: number; totalPages: number; currentPage: number; } }> => {
     try {
-      const response = await apiClient.get('/parking-lots');
+      const queryParams = new URLSearchParams();
+      if (params?.page) queryParams.append('page', params.page.toString());
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      
+      const url = `/parking-lots${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response = await apiClient.get(url);
       
       // Debug the API response data to see what we're actually getting
       console.log('Parking lots API response:', response.data);
@@ -172,7 +182,7 @@ export const parkingLotsService = {
       
       // Map backend response to frontend format
       if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        return response.data.data.map((lot: any) => {
+        const mappedLots = response.data.data.map((lot: any) => {
           // Debug each lot to see what fields are available
           console.log('Mapping lot:', lot);
           
@@ -197,15 +207,50 @@ export const parkingLotsService = {
           console.log('Mapped lot:', mappedLot);
           return mappedLot;
         });
+        
+        // Return data with pagination information if available
+        if (response.data.pagination) {
+          return {
+            data: mappedLots,
+            pagination: {
+              total: response.data.pagination.total || mappedLots.length,
+              totalPages: response.data.pagination.totalPages || Math.ceil(mappedLots.length / (params?.limit || 10)),
+              currentPage: response.data.pagination.currentPage || (params?.page || 1)
+            }
+          };
+        }
+        
+        return {
+          data: mappedLots,
+          pagination: {
+            total: mappedLots.length,
+            totalPages: Math.ceil(mappedLots.length / (params?.limit || 10)),
+            currentPage: params?.page || 1
+          }
+        };
       }
       
-      return [];
+      return { data: [] };
     } catch (error) {
       console.error('Error fetching parking lots:', error);
       toast.error('Failed to fetch parking lots');
       
       // Fallback to mock data if API call fails
-      return MOCK_PARKING_LOTS;
+      // Implement pagination for mock data
+      const page = params?.page || 1;
+      const limit = params?.limit || 10;
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedLots = MOCK_PARKING_LOTS.slice(startIndex, endIndex);
+      
+      return {
+        data: paginatedLots,
+        pagination: {
+          total: MOCK_PARKING_LOTS.length,
+          totalPages: Math.ceil(MOCK_PARKING_LOTS.length / limit),
+          currentPage: page
+        }
+      };
     }
   },
   
@@ -453,43 +498,62 @@ export const reportsService = {
     }
   },
   
-  getDashboardSummary: async (): Promise<DashboardSummary> => {
+  getDashboardSummary: async (params?: { page?: number; limit?: number }): Promise<DashboardSummary> => {
     try {
-      logger.debug('Fetching dashboard summary');
-      const response = await apiClient.get('/reports/dashboard-summary');
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching dashboard summary:', error);
-      toast.error('Failed to fetch dashboard summary');
+      const queryParams = new URLSearchParams();
+      if (params?.page) queryParams.append('page', params.page.toString());
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
       
-      // Fallback to mock implementation
-      const mockRecentActivity = [
-        { 
-          id: 1, 
-          plateNumber: 'ABC123', 
-          activity: 'Entry', 
-          time: new Date(Date.now() - 1800000).toISOString() 
-        },
-        { 
-          id: 2, 
-          plateNumber: 'XYZ789', 
-          activity: 'Exit', 
-          time: new Date(Date.now() - 3600000).toISOString() 
-        },
-        { 
-          id: 3, 
-          plateNumber: 'DEF456', 
-          activity: 'Entry', 
-          time: new Date(Date.now() - 5400000).toISOString() 
-        }
-      ];
+      const url = `/reports/dashboard-summary${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response = await apiClient.get(url);
       
+      if (response.data && response.data.data) {
+        return {
+          todaySummary: response.data.data.todaySummary || { checkIns: 0, checkOuts: 0 },
+          recentActivity: response.data.data.recentActivity || [],
+          pagination: response.data.pagination || {
+            total: response.data.data.recentActivity?.length || 0,
+            totalPages: Math.ceil((response.data.data.recentActivity?.length || 0) / (params?.limit || 10)),
+            currentPage: params?.page || 1
+          }
+        };
+      }
+      
+      // Fallback to mock data
       return {
         todaySummary: {
           checkIns: 24,
           checkOuts: 18
         },
-        recentActivity: mockRecentActivity
+        recentActivity: [
+          { id: 1, plateNumber: 'ABC123', activity: 'Entry', time: '2023-05-19 09:23:15' },
+          { id: 2, plateNumber: 'XYZ789', activity: 'Exit', time: '2023-05-19 08:45:32' },
+          { id: 3, plateNumber: 'DEF456', activity: 'Entry', time: '2023-05-19 08:15:48' }
+        ],
+        pagination: {
+          total: 3,
+          totalPages: Math.ceil(3 / (params?.limit || 10)),
+          currentPage: params?.page || 1
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard summary:', error);
+      // Fallback to mock data
+      return {
+        todaySummary: {
+          checkIns: 24,
+          checkOuts: 18
+        },
+        recentActivity: [
+          { id: 1, plateNumber: 'ABC123', activity: 'Entry', time: '2023-05-19 09:23:15' },
+          { id: 2, plateNumber: 'XYZ789', activity: 'Exit', time: '2023-05-19 08:45:32' },
+          { id: 3, plateNumber: 'DEF456', activity: 'Entry', time: '2023-05-19 08:15:48' }
+        ],
+        pagination: {
+          total: 3,
+          totalPages: Math.ceil(3 / (params?.limit || 10)),
+          currentPage: params?.page || 1
+        }
       };
     }
   }

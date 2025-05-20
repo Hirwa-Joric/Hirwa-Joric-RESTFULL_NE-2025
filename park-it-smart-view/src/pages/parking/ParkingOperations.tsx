@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { parkingLotsService, parkingRecordsService } from '@/services/api';
-import { CreateEntryData, ParkingRecord } from '@/services/parkingRecordService';
+import { parkingLotsService } from '@/services/api';
+import parkingRecordsService, { ParkingRecord } from '@/services/parkingRecordService';
 import ModernDashboardLayout from '@/components/layout/ModernDashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
   CheckCircle, 
   AlertCircle
 } from 'lucide-react';
+import Pagination from '@/components/ui/pagination';
 
 interface ParkingLot {
   id: string;
@@ -75,6 +76,12 @@ const ParkingOperations = () => {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [exitTicket, setExitTicket] = useState<ExitTicket | null>(null);
   const [operationMessage, setOperationMessage] = useState({ type: '', message: '' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize] = useState(10);
+  const [recentRecords, setRecentRecords] = useState<ParkingRecord[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(false);
 
   useEffect(() => {
     const fetchParkingLots = async () => {
@@ -84,13 +91,15 @@ const ParkingOperations = () => {
         console.log('Parking lots data received:', lotsData);
         
         // Map API parking lots to the format expected by the component
-        const mappedLots = lotsData.map(mapApiParkingLotToView);
+        const mappedLots = Array.isArray(lotsData.data) 
+          ? lotsData.data.map(mapApiParkingLotToView)
+          : [];
         console.log('Mapped parking lots:', mappedLots);
         
         setParkingLots(mappedLots);
         
-        if (lotsData.length > 0) {
-          setSelectedLotId(lotsData[0].id);
+        if (mappedLots.length > 0) {
+          setSelectedLotId(mappedLots[0].id);
         }
       } catch (error) {
         console.error('Error fetching parking lots:', error);
@@ -99,6 +108,42 @@ const ParkingOperations = () => {
     
     fetchParkingLots();
   }, []);
+
+  // Add a new effect to fetch recent records with pagination
+  useEffect(() => {
+    const fetchRecentRecords = async () => {
+      setIsLoadingRecords(true);
+      try {
+        const response = await parkingRecordsService.getAll({
+          page: currentPage,
+          limit: pageSize
+        });
+        
+        if (response.success && Array.isArray(response.data.records)) {
+          setRecentRecords(response.data.records);
+          setTotalItems(response.data.total || response.data.records.length);
+          setTotalPages(response.data.totalPages || Math.ceil(response.data.records.length / pageSize));
+        } else {
+          setRecentRecords([]);
+          setTotalItems(0);
+          setTotalPages(1);
+        }
+      } catch (error) {
+        console.error('Error fetching recent records:', error);
+        setRecentRecords([]);
+        setTotalItems(0);
+        setTotalPages(1);
+      } finally {
+        setIsLoadingRecords(false);
+      }
+    };
+    
+    fetchRecentRecords();
+  }, [currentPage, pageSize]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const handleCheckIn = async () => {
     if (!selectedLotId || !plateNumber) {
@@ -294,7 +339,7 @@ const ParkingOperations = () => {
   return (
     <ModernDashboardLayout 
       title="Parking Operations" 
-      subtitle="Manage vehicle entry and exit operations"
+      subtitle="Check in and check out vehicles from your parking lots"
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
@@ -560,6 +605,95 @@ const ParkingOperations = () => {
           </Card>
         </div>
       </div>
+
+      {/* Recent Operations Table with Pagination */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="text-xl font-medium">Recent Operations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingRecords ? (
+            <div className="flex justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
+            </div>
+          ) : recentRecords.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              No recent parking operations found
+            </div>
+          ) : (
+            <>
+              <div className="rounded-md border overflow-hidden">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Vehicle
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Parking Lot
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Entry Time
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Exit Time
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Fee
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-slate-200">
+                    {recentRecords.map((record) => (
+                      <tr key={record.id} className="hover:bg-slate-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                          {record.vehiclePlate || record.car_plate_number}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                          {record.parkingLotName || 'Unknown'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                          {new Date(record.entryTime || record.entry_time).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                          {record.exitTime || record.exit_time 
+                            ? new Date(record.exitTime || record.exit_time).toLocaleString() 
+                            : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge className={`${record.exitTime || record.exit_time ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                            {record.exitTime || record.exit_time ? 'Completed' : 'Active'}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                          {(record.fee || record.charged_amount) 
+                            ? `$${Number(record.fee || record.charged_amount).toFixed(2)}` 
+                            : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Pagination component */}
+              {totalPages > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  pageSize={pageSize}
+                  onPageChange={handlePageChange}
+                  className="mt-4"
+                />
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
     </ModernDashboardLayout>
   );
 };

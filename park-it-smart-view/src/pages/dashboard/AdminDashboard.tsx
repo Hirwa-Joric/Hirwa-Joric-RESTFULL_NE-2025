@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import logger from '@/utils/logger';
+import Pagination from '@/components/ui/pagination';
 
 interface ParkingLotSummary {
   total: number;
@@ -55,6 +56,10 @@ const AdminDashboard = () => {
     thisMonth: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -68,8 +73,8 @@ const AdminDashboard = () => {
         logger.debug('Parking lots data received:', lotsData);
         
         // Calculate summary
-        const totalSpaces = lotsData.reduce((sum: number, lot: ParkingLot) => sum + lot.capacity, 0);
-        const occupiedSpaces = lotsData.reduce((sum: number, lot: ParkingLot) => sum + (lot.capacity - lot.availableSpaces), 0);
+        const totalSpaces = lotsData.data.reduce((sum: number, lot: ParkingLot) => sum + lot.capacity, 0);
+        const occupiedSpaces = lotsData.data.reduce((sum: number, lot: ParkingLot) => sum + (lot.capacity - lot.availableSpaces), 0);
         
         setParkingLotSummary({
           total: totalSpaces,
@@ -79,38 +84,60 @@ const AdminDashboard = () => {
         
         // Fetch dashboard summary data
         try {
-          const dashboardData = await reportsService.getDashboardSummary();
+          const dashboardData = await reportsService.getDashboardSummary({
+            page: currentPage,
+            limit: pageSize
+          });
           logger.debug('Dashboard summary data received:', dashboardData);
           
           if (dashboardData && dashboardData.recentActivity) {
             setRecentActivity(dashboardData.recentActivity);
             setTodaySummary(dashboardData.todaySummary);
+            
+            // Update pagination data
+            if (dashboardData.pagination) {
+              setTotalItems(dashboardData.pagination.total || dashboardData.recentActivity.length);
+              setTotalPages(dashboardData.pagination.totalPages || Math.ceil(dashboardData.recentActivity.length / pageSize));
+            } else {
+              setTotalItems(dashboardData.recentActivity.length);
+              setTotalPages(Math.ceil(dashboardData.recentActivity.length / pageSize));
+            }
+            
             logger.info('Dashboard summary processed successfully');
           } else {
             // Fallback to mock data if API returns invalid data
-            setRecentActivity([
+            const mockActivities = [
               { id: 1, plateNumber: 'ABC123', activity: 'Entry', time: '2023-05-19 09:23:15' },
               { id: 2, plateNumber: 'XYZ789', activity: 'Exit', time: '2023-05-19 08:45:32' },
               { id: 3, plateNumber: 'DEF456', activity: 'Entry', time: '2023-05-19 08:15:48' }
-            ]);
+            ];
+            
+            setRecentActivity(mockActivities);
             setTodaySummary({
               checkIns: 24,
               checkOuts: 18
             });
+            setTotalItems(mockActivities.length);
+            setTotalPages(Math.ceil(mockActivities.length / pageSize));
+            
             logger.warn('Using fallback data for dashboard summary');
           }
         } catch (summaryError: any) {
           logger.error('Error fetching dashboard summary:', summaryError);
           // Fallback to mock data
-          setRecentActivity([
+          const mockActivities = [
             { id: 1, plateNumber: 'ABC123', activity: 'Entry', time: '2023-05-19 09:23:15' },
             { id: 2, plateNumber: 'XYZ789', activity: 'Exit', time: '2023-05-19 08:45:32' },
             { id: 3, plateNumber: 'DEF456', activity: 'Entry', time: '2023-05-19 08:15:48' }
-          ]);
+          ];
+          
+          setRecentActivity(mockActivities);
           setTodaySummary({
             checkIns: 24,
             checkOuts: 18
           });
+          setTotalItems(mockActivities.length);
+          setTotalPages(Math.ceil(mockActivities.length / pageSize));
         }
         
         // Mock revenue data (would come from the reports service in a real application)
@@ -127,7 +154,7 @@ const AdminDashboard = () => {
     };
     
     fetchDashboardData();
-  }, []);
+  }, [currentPage, pageSize]);
 
   const handleAddParkingLot = () => {
     navigate('/admin/parking-lots/new');
@@ -135,6 +162,10 @@ const AdminDashboard = () => {
 
   const handleViewReports = () => {
     navigate('/admin/reports');
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   if (isLoading) {
@@ -293,40 +324,55 @@ const AdminDashboard = () => {
             <Button variant="outline" size="sm" className="text-xs">View All</Button>
           </CardHeader>
           <CardContent>
-            {recentActivity.length > 0 ? (
-              <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-center p-2 rounded-lg hover:bg-slate-50">
-                    <div className={`p-2 rounded-lg mr-3 ${
-                      activity.activity === 'Entry' ? 'bg-teal-50' : 'bg-indigo-50'
-                    }`}>
-                      {activity.activity === 'Entry' ? (
-                        <CheckCircle className={`h-4 w-4 ${
-                          activity.activity === 'Entry' ? 'text-teal-500' : 'text-indigo-500'
-                        }`} />
-                      ) : (
-                        <XCircle className={`h-4 w-4 ${
-                          activity.activity === 'Entry' ? 'text-teal-500' : 'text-indigo-500'
-                        }`} />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">
-                        Vehicle {activity.plateNumber} {activity.activity === 'Entry' ? 'entered' : 'exited'} parking
-                      </p>
-                      <p className="text-xs text-slate-500">{activity.time}</p>
-                    </div>
-                  </div>
-                ))}
+            {recentActivity.length === 0 ? (
+              <div className="text-center py-6 text-slate-500">
+                No recent activity to display
               </div>
             ) : (
-              <div className="text-center py-8">
-                <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                  <Car className="h-6 w-6 text-slate-400" />
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left">
+                        <th className="pb-2 pt-1 font-medium text-slate-500">Vehicle</th>
+                        <th className="pb-2 pt-1 font-medium text-slate-500">Activity</th>
+                        <th className="pb-2 pt-1 font-medium text-slate-500 text-right">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentActivity.map((item) => (
+                        <tr key={item.id} className="border-t border-slate-100">
+                          <td className="py-3 font-medium text-slate-700">{item.plateNumber}</td>
+                          <td className="py-3">
+                            <Badge
+                              className={
+                                item.activity === 'Entry'
+                                  ? 'bg-green-50 text-green-700 hover:bg-green-50'
+                                  : 'bg-orange-50 text-orange-700 hover:bg-orange-50'
+                              }
+                            >
+                              {item.activity}
+                            </Badge>
+                          </td>
+                          <td className="py-3 text-slate-500 text-right">{new Date(item.time).toLocaleTimeString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <h3 className="text-slate-800 font-medium mb-1">No recent activity</h3>
-                <p className="text-slate-500 text-sm mb-4">Parking activities will appear here</p>
-              </div>
+                
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalItems}
+                    pageSize={pageSize}
+                    onPageChange={handlePageChange}
+                    className="mt-4"
+                  />
+                )}
+              </>
             )}
           </CardContent>
         </Card>
