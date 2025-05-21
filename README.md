@@ -153,3 +153,54 @@ If the start-servers.sh script fails, try:
 This project is licensed under the ISC License. # RESTFULL_NE-2025
 # Hirwa-Joric-RESTFULL_NE-2025
 # Hirwa-Joric-RESTFULL_NE-2025
+
+## Logging System
+
+The XWZ Parking Management System includes a robust logging system that records application events and operations. Logs are written to both the console during development and persistent log files for production use.
+
+### Log Files
+
+Logs are stored in the `/logs` directory with the following files:
+
+- `combined.log`: Contains all log messages
+- `error.log`: Contains only error-level logs
+- `transactions.log`: Contains information about parking operations
+- `exceptions.log`: Contains uncaught exceptions
+- `rejections.log`: Contains unhandled promise rejections
+
+### Log Levels
+
+The system uses the following log levels (from highest to lowest priority):
+
+- `error`: Critical errors that affect system operation
+- `warn`: Warnings about potential issues
+- `info`: Informational messages about normal operation (e.g., car entry/exit)
+- `debug`: Detailed debugging information
+- `http`: HTTP request/response logs
+
+### Parking Operation Logs
+
+All parking entry and exit operations are logged with detailed information including:
+
+- Record ID
+- Vehicle plate number
+- Parking lot information
+- Timestamps
+- Duration and charges
+- Available spaces
+
+### Graceful Shutdown
+
+The logging system ensures all logs are properly written even when the server is shut down. The application handles SIGTERM and SIGINT signals to:
+
+1. Log the shutdown event
+2. Complete any pending log writes
+3. Close the server gracefully
+
+This ensures no log messages are lost when the application terminates.
+
+### Configuration
+
+The logging system is configured in `backend/src/utils/logger.js` using the Winston logging library. Log files are automatically rotated when they reach 5MB, with a maximum of 5 files kept for each log type.
+
+In production mode, only `info` level and higher logs are recorded. In development mode, `debug` level logs are also included.

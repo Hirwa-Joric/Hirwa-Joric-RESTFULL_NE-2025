@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const db = require('../config/db');
+const logger = require('../utils/logger');
 
 /**
  * @desc    Get dashboard summary (today's check-ins, check-outs, recent activity)
@@ -8,6 +9,8 @@ const db = require('../config/db');
  */
 const getDashboardSummary = async (req, res) => {
   try {
+    logger.info('Fetching dashboard summary');
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -49,18 +52,26 @@ const getDashboardSummary = async (req, res) => {
       time: record.activity_time
     }));
     
+    const todaySummary = {
+      checkIns: parseInt(checkInsResult.rows[0].count),
+      checkOuts: parseInt(checkOutsResult.rows[0].count)
+    };
+    
+    logger.debug('Dashboard summary data', { 
+      checkIns: todaySummary.checkIns, 
+      checkOuts: todaySummary.checkOuts, 
+      recentActivityCount: recentActivity.length 
+    });
+    
     res.json({
       success: true,
       data: {
-        todaySummary: {
-          checkIns: parseInt(checkInsResult.rows[0].count),
-          checkOuts: parseInt(checkOutsResult.rows[0].count)
-        },
+        todaySummary,
         recentActivity
       }
     });
   } catch (error) {
-    console.error('Get dashboard summary error:', error.message);
+    logger.error('Get dashboard summary error', { error: error.message, stack: error.stack });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -74,6 +85,7 @@ const getOutgoingCarsReport = async (req, res) => {
   // Check validation errors
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    logger.warn('Validation errors in outgoing cars report request', { errors: errors.array() });
     return res.status(400).json({ success: false, errors: errors.array() });
   }
 
@@ -82,6 +94,8 @@ const getOutgoingCarsReport = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+    
+    logger.info('Generating outgoing cars report', { startDate, endDate, page, limit });
 
     // Add time to endDate to include the entire day
     const queryEndDate = new Date(endDate);
@@ -127,6 +141,14 @@ const getOutgoingCarsReport = async (req, res) => {
         fee: parseFloat(record.charged_amount)
       };
     });
+    
+    logger.debug('Outgoing cars report generated', { 
+      totalRecords: total,
+      totalAmount,
+      recordsInPage: records.length,
+      page,
+      pages: Math.ceil(total / limit)
+    });
 
     res.json({
       success: true,
@@ -143,7 +165,12 @@ const getOutgoingCarsReport = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get outgoing cars report error:', error.message);
+    logger.error('Get outgoing cars report error', { 
+      error: error.message, 
+      stack: error.stack,
+      startDate: req.query.startDate,
+      endDate: req.query.endDate
+    });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -157,6 +184,7 @@ const getEnteredCarsReport = async (req, res) => {
   // Check validation errors
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    logger.warn('Validation errors in entered cars report request', { errors: errors.array() });
     return res.status(400).json({ success: false, errors: errors.array() });
   }
 
@@ -165,6 +193,8 @@ const getEnteredCarsReport = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+    
+    logger.info('Generating entered cars report', { startDate, endDate, page, limit });
 
     // Add time to endDate to include the entire day
     const queryEndDate = new Date(endDate);
@@ -203,6 +233,13 @@ const getEnteredCarsReport = async (req, res) => {
         fee: parseFloat(record.charged_amount) || 0
       };
     });
+    
+    logger.debug('Entered cars report generated', { 
+      totalRecords: total,
+      recordsInPage: records.length,
+      page,
+      pages: Math.ceil(total / limit)
+    });
 
     res.json({
       success: true,
@@ -218,7 +255,12 @@ const getEnteredCarsReport = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get entered cars report error:', error.message);
+    logger.error('Get entered cars report error', { 
+      error: error.message, 
+      stack: error.stack,
+      startDate: req.query.startDate,
+      endDate: req.query.endDate
+    });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };

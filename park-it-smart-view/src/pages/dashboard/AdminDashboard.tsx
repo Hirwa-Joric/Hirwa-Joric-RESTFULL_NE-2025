@@ -192,8 +192,8 @@ const AdminDashboard = () => {
           // Process each record
           if (response && response.records) {
             response.records.forEach(record => {
-              const exitTime = new Date(record.exitTime || record.exit_time || '');
-              const amount = record.fee || record.charged_amount || 0;
+              const exitTime = new Date(record.exitTime || '');
+              const amount = record.fee || 0;
               
               // Add to month total
               monthRevenue += amount;
@@ -398,30 +398,73 @@ const AdminDashboard = () => {
             </div>
             
             {/* Revenue chart */}
-            <div className="bg-white rounded-lg h-[180px] w-full flex flex-col">
-              <div className="relative w-full h-full px-2">
+            <div className="bg-white rounded-lg h-[220px] w-full flex flex-col">
+              <div className="relative w-full h-full px-4 pt-4">
+                {/* Y-axis labels */}
+                <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-slate-400 pt-6 pb-8">
+                  <div>$1000</div>
+                  <div>$750</div>
+                  <div>$500</div>
+                  <div>$250</div>
+                  <div>$0</div>
+                </div>
+                
+                {/* Grid lines */}
+                <div className="absolute left-8 right-4 top-6 bottom-8 flex flex-col justify-between">
+                  <div className="border-t border-slate-100 w-full h-0"></div>
+                  <div className="border-t border-slate-100 w-full h-0"></div>
+                  <div className="border-t border-slate-100 w-full h-0"></div>
+                  <div className="border-t border-slate-100 w-full h-0"></div>
+                  <div className="border-t border-slate-100 w-full h-0"></div>
+                </div>
+                
                 {/* Chart visualization */}
-                <div className="flex h-[140px] items-end space-x-2 pt-5">
+                <div className="flex h-[160px] items-end space-x-1 pt-5 pb-2 ml-8">
                   {revenueData.dailyHistory.map((day, index) => {
                     // Calculate height percentage based on maximum value
                     const maxAmount = Math.max(...revenueData.dailyHistory.map(d => d.amount));
                     const heightPercent = maxAmount > 0 ? (day.amount / maxAmount) * 100 : 0;
                     
                     return (
-                      <div key={day.date} className="flex-1 flex flex-col items-center">
+                      <div key={day.date} className="flex-1 flex flex-col items-center group relative">
+                        {/* Tooltip */}
+                        <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                          <div className="bg-slate-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
+                            {day.date}: ${day.amount.toFixed(2)}
+                          </div>
+                          <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800 mx-auto"></div>
+                        </div>
+                        
+                        {/* Bar */}
                         <div 
-                          className={`w-full rounded-t-sm ${index % 2 === 0 ? 'bg-teal-500' : 'bg-teal-400'}`}
-                          style={{ height: `${heightPercent}%` }}
-                        ></div>
-                        <div className="text-xs text-slate-500 mt-1">{day.date}</div>
+                          className={`w-full ${index % 2 === 0 ? 'bg-gradient-to-t from-teal-500 to-teal-400' : 'bg-gradient-to-t from-teal-400 to-teal-300'} rounded-t-sm group-hover:bg-teal-600 transition-colors relative`}
+                          style={{ height: `${heightPercent}%`, minHeight: '4px' }}
+                        >
+                          {/* Value indicator dot */}
+                          <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 rounded-full bg-white border border-teal-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        </div>
+                        
+                        {/* X-axis label */}
+                        <div className="text-xs font-medium text-slate-500 mt-2">{day.date}</div>
                       </div>
                     );
                   })}
                 </div>
                 
-                {/* Hover info - would be interactive in a real implementation */}
-                <div className="absolute bottom-8 right-8 bg-white/80 text-xs text-slate-500 px-2 py-1 rounded border border-slate-100">
-                  Average: ${(revenueData.thisWeek / 7).toFixed(2)}/day
+                {/* Stats overlay */}
+                <div className="absolute top-4 right-4 bg-white/90 text-xs px-3 py-2 rounded-md border border-slate-100 shadow-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+                    <span className="text-slate-700">Weekly avg: <span className="font-medium">${(revenueData.thisWeek / 7).toFixed(2)}</span></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                    <span className="text-slate-700">
+                      Growth: <span className={`font-medium ${revenueData.percentChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {revenueData.percentChange >= 0 ? '+' : ''}{revenueData.percentChange.toFixed(1)}%
+                      </span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
