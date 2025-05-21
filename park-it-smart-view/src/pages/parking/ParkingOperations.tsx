@@ -37,6 +37,14 @@ interface ExitTicket {
   totalCharge: number;
 }
 
+interface EntryTicket {
+  id: string;
+  plateNumber: string;
+  parkingLot: string;
+  entryTime: string;
+  estimatedCharge: number;
+}
+
 // Map API parking lot to view model
 const mapApiParkingLotToView = (apiLot: any): ParkingLot => {
   // Log the lot to see what fields are available
@@ -75,6 +83,7 @@ const ParkingOperations = () => {
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [exitTicket, setExitTicket] = useState<ExitTicket | null>(null);
+  const [entryTicket, setEntryTicket] = useState<EntryTicket | null>(null);
   const [operationMessage, setOperationMessage] = useState({ type: '', message: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -155,6 +164,7 @@ const ParkingOperations = () => {
     }
     
     setIsCheckingIn(true);
+    setEntryTicket(null);
     
     try {
       // Create the entry data with the correct field names
@@ -170,6 +180,21 @@ const ParkingOperations = () => {
         // Get the ticket info from the response
         const ticket = response.data.ticket;
         
+        // Find the parking lot to get the name
+        const selectedLot = parkingLots.find(lot => lot.id === selectedLotId);
+        const lotName = selectedLot ? selectedLot.name : 'Unknown';
+        
+        // Create a formatted entry ticket
+        const newEntryTicket: EntryTicket = {
+          id: ticket.id || '',
+          plateNumber: plateNumber,
+          parkingLot: lotName,
+          entryTime: ticket.entry_time || new Date().toISOString(),
+          estimatedCharge: ticket.charged_amount || 0
+        };
+        
+        setEntryTicket(newEntryTicket);
+        
         // Clear form and show success message
         setPlateNumber('');
         setOperationMessage({ 
@@ -179,8 +204,10 @@ const ParkingOperations = () => {
         
         // Refresh the parking lots to update the available spaces
         const lotsData = await parkingLotsService.getAll();
-        const mappedLots = lotsData.map(mapApiParkingLotToView);
-        setParkingLots(mappedLots);
+        if (Array.isArray(lotsData.data)) {
+          const mappedLots = lotsData.data.map(mapApiParkingLotToView);
+          setParkingLots(mappedLots);
+        }
       } else {
         throw new Error('Failed to create parking entry');
       }
@@ -300,8 +327,12 @@ const ParkingOperations = () => {
           entryTime: exitTicketData.entry_time || 'Unknown',
           exitTime: exitTicketData.exit_time || new Date().toISOString(),
           durationInHours: typeof exitTicketData.durationHours === 'number' ? exitTicketData.durationHours : 0,
-          totalCharge: typeof exitTicketData.charged_amount === 'number' ? exitTicketData.charged_amount : 0
+          totalCharge: parseFloat(exitTicketData.charged_amount) || 0
         };
+        
+        // Debug the ticket values to verify fee calculation
+        console.log('Exit ticket data from API:', exitTicketData);
+        console.log('Formatted exit ticket:', ticket);
         
         setExitTicket(ticket);
         setOperationMessage({ 
@@ -312,8 +343,10 @@ const ParkingOperations = () => {
         
         // Refresh the parking lots to update the available spaces
         const lotsData = await parkingLotsService.getAll();
-        const mappedLots = lotsData.map(mapApiParkingLotToView);
-        setParkingLots(mappedLots);
+        if (lotsData && lotsData.data && Array.isArray(lotsData.data)) {
+          const mappedLots = lotsData.data.map(mapApiParkingLotToView);
+          setParkingLots(mappedLots);
+        }
       } else {
         setOperationMessage({ 
           type: 'error', 
@@ -333,6 +366,7 @@ const ParkingOperations = () => {
 
   const clearResults = () => {
     setExitTicket(null);
+    setEntryTicket(null);
     setOperationMessage({ type: '', message: '' });
   };
 
@@ -452,7 +486,67 @@ const ParkingOperations = () => {
             </Card>
           )}
           
-          {operationMessage.message && !exitTicket && (
+          {entryTicket && !exitTicket && (
+            <Card className="border-0 shadow-sm bg-blue-50">
+              <CardHeader>
+                <CardTitle className="text-lg font-medium">Entry Ticket</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-white p-6 rounded-lg border border-blue-100 shadow-sm">
+                  <div className="flex justify-between items-start mb-4 pb-4 border-b border-dashed border-slate-200">
+                    <div>
+                      <h3 className="text-xl font-bold">ParkWise Ticket</h3>
+                      <p className="text-slate-500 text-sm">Welcome to our parking</p>
+                    </div>
+                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                      <LogIn className="mr-1 h-3 w-3" />
+                      Check-In
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-slate-500">Ticket ID</p>
+                        <p className="font-semibold">{entryTicket.id}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500">Plate Number</p>
+                        <p className="font-semibold">{entryTicket.plateNumber}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-slate-500">Parking Lot</p>
+                        <p>{entryTicket.parkingLot}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500">Entry Time</p>
+                        <p>{new Date(entryTicket.entryTime).toLocaleString()}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-slate-500">Estimated Fee (1 hour minimum)</p>
+                        <p className="font-bold text-lg">${entryTicket.estimatedCharge.toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 font-medium text-blue-600">Fee is based on actual duration at exit</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 pt-4 border-t border-slate-200 flex justify-end">
+                    <Button variant="outline" onClick={clearResults}>Close</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {operationMessage.message && !exitTicket && !entryTicket && (
             <div className={`p-4 rounded-lg ${
               operationMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
             } flex items-start`}>
@@ -650,27 +744,27 @@ const ParkingOperations = () => {
                     {recentRecords.map((record) => (
                       <tr key={record.id} className="hover:bg-slate-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-                          {record.vehiclePlate || record.car_plate_number}
+                          {record.car_plate_number}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                          {record.parkingLotName || 'Unknown'}
+                          {record.parking_lot_name || 'Unknown'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                          {new Date(record.entryTime || record.entry_time).toLocaleString()}
+                          {new Date(record.entry_time).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                          {record.exitTime || record.exit_time 
-                            ? new Date(record.exitTime || record.exit_time).toLocaleString() 
+                          {record.exit_time 
+                            ? new Date(record.exit_time).toLocaleString() 
                             : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge className={`${record.exitTime || record.exit_time ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
-                            {record.exitTime || record.exit_time ? 'Completed' : 'Active'}
+                          <Badge className={`${record.exit_time ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                            {record.exit_time ? 'Completed' : 'Active'}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                          {(record.fee || record.charged_amount) 
-                            ? `$${Number(record.fee || record.charged_amount).toFixed(2)}` 
+                          {record.charged_amount > 0 
+                            ? `$${Number(record.charged_amount).toFixed(2)}` 
                             : '-'}
                         </td>
                       </tr>

@@ -31,7 +31,8 @@ export interface ExitTicket {
 
 export interface ParkingRecordResponse {
   records: ParkingRecord[];
-  total_count: number;
+  total: number;
+  totalPages: number;
   page: number;
   limit: number;
 }
@@ -53,6 +54,17 @@ const parkingRecordService = {
   // Find active parking record by plate number
   findByPlate: async (plateNumber: string): Promise<{success: boolean, data: ParkingRecord}> => {
     const response = await apiClient.get<{success: boolean, data: ParkingRecord}>(`/parking-records/plate/${plateNumber}`);
+    return response.data;
+  },
+  
+  // Get all parking records with pagination
+  getAll: async (params?: { page?: number; limit?: number }): Promise<{success: boolean, data: {records: ParkingRecord[], total: number, totalPages: number}}> => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    const url = `/parking-records${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const response = await apiClient.get(url);
     return response.data;
   },
   

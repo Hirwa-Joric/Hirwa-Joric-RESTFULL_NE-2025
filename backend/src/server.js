@@ -1,11 +1,16 @@
 const express = require('express');
 const cors = require('cors');
+const morgan = require('morgan');
 require('dotenv').config();
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const logger = require('./utils/logger');
 
 // Initialize express app
 const app = express();
+
+// Configure request logging with morgan and our custom logger
+app.use(morgan('combined', { stream: logger.stream }));
 
 // Middleware
 app.use(cors({
@@ -60,12 +65,19 @@ app.use('/api/reports', reportRoutes);
 
 // Home route
 app.get('/', (req, res) => {
+  logger.info('Home route accessed');
   res.json({ message: 'Welcome to XWZ Car Parking Management API' });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  logger.error('Global error handler caught an error', { 
+    error: err.message, 
+    stack: err.stack,
+    method: req.method,
+    url: req.originalUrl
+  });
+  
   res.status(500).json({
     success: false,
     error: err.message || 'Internal Server Error',
@@ -74,7 +86,25 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-}); 
+const server = app.listen(PORT, () => {
+  logger.info(`Server started and running on port ${PORT}`);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+function shutdown() {
+  logger.info('Received shutdown signal, closing server gracefully');
+  server.close(() => {
+    logger.info('Server closed successfully');
+    process.exit(0);
+  });
+  
+  // Force close if not closed within 10 seconds
+  setTimeout(() => {
+    logger.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+} 
 
